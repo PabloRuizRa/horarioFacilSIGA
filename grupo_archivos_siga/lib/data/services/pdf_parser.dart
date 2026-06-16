@@ -1,6 +1,6 @@
 // ignore_for_file: avoid_print, unused_local_variable
-import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/asignatura.dart';
 import '../models/bloque.dart';
@@ -9,11 +9,11 @@ import '../models/horario.dart';
 class PdfParser {
   static const String apiUrl = 'http://127.0.0.1:8000/extract-text';
 
-  Future<Horario> parseHorarioFromPDF(File pdfFile, String periodo) async {
+  Future<Horario> parseHorarioFromBytes(Uint8List pdfBytes, String fileName, String periodo) async {
     try {
       // 1. Enviar PDF a la API
       var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
-      request.files.add(await http.MultipartFile.fromPath('file', pdfFile.path));
+      request.files.add(http.MultipartFile.fromBytes('file', pdfBytes, filename: fileName));
 
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
@@ -24,9 +24,6 @@ class PdfParser {
       }
 
       final String texto = jsonResponse['text'] ?? '';
-      print('=== TEXTO EXTRAÍDO ===');
-      print(texto.substring(0, texto.length > 500 ? 500 : texto.length));
-      print('======================');
 
       // 2. Extraer nombre del estudiante
       String estudiante = 'Estudiante UTFSM';
@@ -36,78 +33,85 @@ class PdfParser {
         estudiante = estudianteMatch.group(1)!.trim();
       }
 
-      // 3. Extraer asignaturas y bloques
       final Map<String, Asignatura> asignaturasMap = {};
+      final Map<String, String> salasMap = {}; 
       final List<Bloque> bloques = [];
 
-      // Patrón para el detalle de horario
-      final detalleRegex = RegExp(
-        r'(\d+) \((\d{2}:\d{2})[-–](\d{2}:\d{2})\)\s+([A-Z0-9]+)\s*-\s*([^-]+?)\s*\(([^)]+)\)\s+sala\s+(\S+)\s+(\d+)\s+([A-Za-zÁÉÍÓÚÑáéíóúñ\s]+)\s+([A-Za-z.]+)\s+([^\n]+)',
-      );
+      // 3. Extraer TODAS las asignaturas Y LAS SALAS
+      final asignaturaRegex = RegExp(r'([A-Z]{3}\d{3}[A-Z-]*?)\s*-\s*([A-ZÁÉÍÓÚÑa-záéíóúñ0-9\s]+?)\s*\((Inscrita|Preinscrita)\)(?:\s*sala\s+([A-Z0-9]+))?');
+      
+      for (var match in asignaturaRegex.allMatches(texto)) {
+        final codigo = match.group(1)!.trim();
+        final nombre = match.group(2)!.replaceAll(RegExp(r'\s+'), ' ').trim(); 
+        final tipo = match.group(3)!.trim();
+        final salaExtraida = match.group(4);
 
-      for (var match in detalleRegex.allMatches(texto)) {
-        final numBloque = int.parse(match.group(1)!);
-        final horaInicio = match.group(2)!;
-        final horaFin = match.group(3)!;
-        final codigo = match.group(4)!;
-        String nombreCompleto = match.group(5)!.trim();
-        final tipo = match.group(6)!.contains('Inscrita') ? 'Inscrita' : 'Preinscrita';
-        final sala = match.group(7)!;
-        final seccion = match.group(8)!;
-        final profesor = match.group(9)!.trim();
+        // Si la Regex encontró una sala, la guardamos asociada al código del ramo
+        if (salaExtraida != null) {
+          salasMap[codigo] = salaExtraida;
+        }
 
-        // Limpiar nombre
-        nombreCompleto = nombreCompleto.replaceAll(RegExp(r'\([^)]+\)'), '').trim();
-
-        // Día desde el contexto (lo determinamos por la posición)
-        String dia = _determinarDia(texto, match.start);
-
-        // Crear o obtener asignatura
         if (!asignaturasMap.containsKey(codigo)) {
           asignaturasMap[codigo] = Asignatura(
             id: codigo,
-            nombre: nombreCompleto,
+            nombre: nombre,
             codigo: codigo,
-            profesor: profesor,
-            seccion: seccion,
+            profesor: 'Revisar en SIGA', 
+            seccion: 'Por definir',
             tipo: tipo,
           );
         }
-
-        bloques.add(Bloque(
-          id: '${codigo}_${dia}_$numBloque',
-          asignaturaId: codigo,
-          dia: dia,
-          numeroBloque: numBloque,
-          horaInicio: horaInicio,
-          horaFin: horaFin,
-          sala: sala,
-        ));
       }
 
-      // También buscar en la tabla de horario
-      final tablaRegex = RegExp(r'(\d+)\s+([A-Z0-9]+)\s*-\s*(\d+)\s*\(([^)]+)\)');
-
+      // Respaldo: Buscar en la tabla superior (ej: ELE053-300 (Ins))
+      final tablaRegex = RegExp(r'([A-Z]{3}\d{3}[A-Z]*)(-[A-Z])?-(\d{3})\s*\((Ins|Pre)\)');
       for (var match in tablaRegex.allMatches(texto)) {
-        final numBloque = int.parse(match.group(1)!);
-        final codigo = match.group(2)!;
-        final seccion = match.group(3)!;
-        final tipo = match.group(4)!.contains('Ins') ? 'Inscrita' : 'Preinscrita';
+        final codigoBase = match.group(1)!;
+        final variante = match.group(2) ?? '';
+        final codigoCompleto = '$codigoBase$variante';
+        final tipo = match.group(4) == 'Ins' ? 'Inscrita' : 'Preinscrita';
 
-        if (!asignaturasMap.containsKey(codigo)) {
-          asignaturasMap[codigo] = Asignatura(
-            id: codigo,
-            nombre: codigo,
-            codigo: codigo,
-            profesor: 'Por definir',
-            seccion: seccion.toString(),
+        if (!asignaturasMap.containsKey(codigoCompleto)) {
+          asignaturasMap[codigoCompleto] = Asignatura(
+            id: codigoCompleto,
+            nombre: 'Asignatura $codigoCompleto',
+            codigo: codigoCompleto,
+            profesor: 'Revisar en SIGA',
+            seccion: match.group(3)!,
             tipo: tipo,
           );
         }
       }
 
       if (asignaturasMap.isEmpty) {
-        throw Exception('No se pudo extraer información del PDF. Verifica el formato.');
+        throw Exception('No se encontraron asignaturas. Verifica el formato del PDF.');
+      }
+
+      // 4. Extraer bloques de horario
+      final bloqueRegex = RegExp(r'\((\d{2}:\d{2})-(\d{2}:\d{2})\)');
+      final matchesHoras = bloqueRegex.allMatches(texto).toList();
+      
+      int matchIndex = 0;
+      
+      for (var asignatura in asignaturasMap.values) {
+        String horaIni = "00:00";
+        String horaFin = "00:00";
+        
+        if (matchIndex < matchesHoras.length) {
+           horaIni = matchesHoras[matchIndex].group(1)!;
+           horaFin = matchesHoras[matchIndex].group(2)!;
+           matchIndex++;
+        }
+
+        bloques.add(Bloque(
+          id: '${asignatura.codigo}_blk',
+          asignaturaId: asignatura.id,
+          dia: 'Por definir', 
+          numeroBloque: 1,
+          horaInicio: horaIni,
+          horaFin: horaFin,
+          sala: salasMap[asignatura.codigo] ?? 'Por definir',
+        ));
       }
 
       return Horario(
@@ -119,21 +123,7 @@ class PdfParser {
         bloques: bloques,
       );
     } catch (e) {
-      print('Error en parseHorarioFromPDF: $e');
       throw Exception('Error al procesar PDF: $e');
     }
-  }
-
-  String _determinarDia(String texto, int posicion) {
-    final textoAntes = texto.substring(0, posicion > 500 ? posicion : 0);
-
-    if (textoAntes.contains('Lunes')) return 'Lunes';
-    if (textoAntes.contains('Martes')) return 'Martes';
-    if (textoAntes.contains('Miércoles')) return 'Miércoles';
-    if (textoAntes.contains('Jueves')) return 'Jueves';
-    if (textoAntes.contains('Viernes')) return 'Viernes';
-    if (textoAntes.contains('Sábado')) return 'Sábado';
-
-    return 'Por definir';
   }
 }

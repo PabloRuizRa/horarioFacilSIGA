@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:io';
+import 'dart:typed_data';
+//import 'dart:io';
 import '../../data/models/horario.dart';
 import '../../data/services/pdf_parser.dart';
 import '../../data/repositories/horario_repository.dart';
@@ -16,10 +17,12 @@ class HorarioNotifier extends StateNotifier<Horario?> {
 
   HorarioNotifier(this.ref) : super(null);
 
-  Future<void> importarHorario(File pdf, String periodo) async {
+  Future<void> importarHorario(Uint8List pdfBytes, String fileName, String periodo) async {
     final parser = ref.read(pdfParserProvider);
     final repo = ref.read(repositoryProvider);
-    final horario = await parser.parseHorarioFromPDF(pdf, periodo);
+    
+    final horario = await parser.parseHorarioFromBytes(pdfBytes, fileName, periodo);
+    
     await repo.guardarHorario(horario);
     state = horario;
   }

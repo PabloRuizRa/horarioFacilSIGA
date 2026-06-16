@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart' as fp;
+import 'package:file_picker/file_picker.dart'; // <-- Le quitamos el "as fp"
 import '../providers/horario_provider.dart';
 import 'horario_screen.dart';
 
@@ -18,16 +18,24 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
   Future<void> importarPDF() async {
     setState(() => isLoading = true);
     try {
-      final result = await fp.FilePicker.pickFiles(
-        type: fp.FileType.custom,
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
         allowedExtensions: ['pdf'],
+        withData: true, // <-- CRUCIAL PARA WEB: Fuerza la carga de los bytes
       );
 
       if (result != null) {
-        final file = File(result.files.single.path!);
+        // Extraemos los bytes y el nombre
+        final fileBytes = result.files.single.bytes;
+        final fileName = result.files.single.name;
+
+        if (fileBytes == null) {
+          throw Exception("No se pudo leer el archivo en el navegador.");
+        }
 
         if (!mounted) return;
-
+        
+        // Aquí devolvemos el código original de tu diálogo
         final periodo = await showDialog<String>(
           context: context,
           builder: (context) => AlertDialog(
@@ -47,7 +55,9 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
         );
 
         if (periodo != null) {
-          await ref.read(horarioProvider.notifier).importarHorario(file, periodo);
+          if (!mounted) return;
+          // Pasamos los bytes al provider
+          await ref.read(horarioProvider.notifier).importarHorario(fileBytes, fileName, periodo);
 
           if (mounted) {
             Navigator.pushReplacement(
