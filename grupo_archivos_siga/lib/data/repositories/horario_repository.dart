@@ -3,29 +3,33 @@ import '../models/horario.dart';
 
 class HorarioRepository {
   static const String _boxName = 'horarios';
-  late Box<Horario> _box;
 
-  HorarioRepository() {
-    _init();
-  }
-
-  Future<void> _init() async {
-    _box = await Hive.openBox<Horario>(_boxName);
+  Future<Box<Horario>> _getBox() async {
+    return await Hive.openBox<Horario>(_boxName);
   }
 
   Future<void> guardarHorario(Horario horario) async {
-    await _box.put(horario.id, horario);
+    final box = await _getBox();
+    await box.put(horario.id, horario);
   }
 
-  Horario? obtenerHorario(String id) {
-    return _box.get(id);
+  Future<Horario?> obtenerHorario(String id) async {
+    final box = await _getBox();
+    return box.get(id);
   }
 
-  List<Horario> obtenerTodosHorarios() {
-    return _box.values.toList();
+  Future<List<Horario>> obtenerTodosHorarios() async {
+    final box = await _getBox();
+    return box.values.toList();
   }
 
   Future<void> eliminarHorario(String id) async {
-    await _box.delete(id);
+    final box = await _getBox();
+    await box.delete(id);
+  }
+
+  Future<void> limpiarTodos() async {
+    final box = await _getBox();
+    await box.clear();
   }
 }

@@ -1,5 +1,4 @@
 import 'package:hive/hive.dart';
-import 'package:flutter/material.dart';
 
 part 'asignatura.g.dart';
 
@@ -21,7 +20,7 @@ class Asignatura {
   final String seccion;
 
   @HiveField(5)
-  final String tipo;
+  final String tipo; // Inscrita o Preinscrita
 
   Asignatura({
     required this.id,
@@ -31,9 +30,4 @@ class Asignatura {
     required this.seccion,
     required this.tipo,
   });
-
-  Color get color {
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink];
-    return colors[id.hashCode % colors.length].withOpacity(0.3);
-  }
 }

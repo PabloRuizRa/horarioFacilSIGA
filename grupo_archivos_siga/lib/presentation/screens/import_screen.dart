@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart' as fp;
 import '../providers/horario_provider.dart';
 import 'horario_screen.dart';
 
@@ -18,20 +18,21 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
   Future<void> importarPDF() async {
     setState(() => isLoading = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
+      final result = await fp.FilePicker.pickFiles(
+        type: fp.FileType.custom,
         allowedExtensions: ['pdf'],
       );
 
       if (result != null) {
         final file = File(result.files.single.path!);
 
-        // Mostrar diálogo para seleccionar periodo
+        if (!mounted) return;
+
         final periodo = await showDialog<String>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Seleccionar Periodo'),
-            content: const Text('Ejemplo: 2026-1'),
+            content: const Text('Ingrese el periodo académico (ej: 2026-1)'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, null),
@@ -59,7 +60,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -72,6 +73,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
       appBar: AppBar(
         title: const Text('Importar Horario'),
         centerTitle: true,
+        backgroundColor: const Color(0xFF0033A0),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -110,7 +112,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
                 icon: isLoading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.upload_file),
                 label: Text(isLoading ? 'Procesando PDF...' : 'Seleccionar archivo PDF'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: const Color(0xFF0033A0),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
