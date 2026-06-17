@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart'; // <-- Le quitamos el "as fp"
 import '../providers/horario_provider.dart';
 import 'horario_screen.dart';
+import '../providers/navigation_provider.dart';
 
 class ImportScreen extends ConsumerStatefulWidget {
   const ImportScreen({super.key});
@@ -60,10 +60,8 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
           await ref.read(horarioProvider.notifier).importarHorario(fileBytes, fileName, periodo);
 
           if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HorarioScreen()),
-            );
+            // Cambia el menú de abajo a la pestaña 0 ("Inicio")
+            ref.read(bottomNavProvider.notifier).state = 0;
           }
         }
       }

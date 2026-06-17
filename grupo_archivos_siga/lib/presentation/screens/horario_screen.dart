@@ -1,9 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // <-- Para obtener el usuario y cerrar sesión
 import '../providers/horario_provider.dart';
+import 'import_screen.dart';
+import 'login_screen.dart';
 
 class HorarioScreen extends ConsumerWidget {
   const HorarioScreen({super.key});
+
+  // --- WIDGET DEL MENÚ LATERAL (DRAWER) ---
+  Widget _buildDrawer(BuildContext context) {
+    // Obtenemos el usuario actual de Firebase
+    final user = FirebaseAuth.instance.currentUser;
+    final userEmail = user?.email ?? 'correo@usm.cl';
+
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          UserAccountsDrawerHeader(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0033A0), Color(0xFF6B4E9E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            accountName: const Text(
+              'Estudiante UTFSM',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            accountEmail: Text(userEmail),
+            currentAccountPicture: const CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person, size: 40, color: Color(0xFF0033A0)),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.schedule, color: Color(0xFF0033A0)),
+            title: const Text('Mi Horario'),
+            onTap: () {
+              // Simplemente cierra el menú porque ya estamos en esta pantalla
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.upload_file, color: Color(0xFF0033A0)),
+            title: const Text('Importar Nuevo Horario'),
+            onTap: () {
+              Navigator.pop(context); // Cierra el menú
+              // Navega a la pantalla de importación
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ImportScreen()),
+              );
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red)),
+            onTap: () async {
+              // Cierra sesión en Firebase y limpia el historial de navegación
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false, // Elimina las rutas anteriores para no volver con el botón de "atrás"
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  // ----------------------------------------
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -13,8 +86,10 @@ class HorarioScreen extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Mi Horario'),
-          backgroundColor: const Color(0xFF0033A0),
+          backgroundColor: const Color(0xFF1B2A4A),
+          foregroundColor: Colors.white,
         ),
+        drawer: _buildDrawer(context), // <-- Agregamos el menú aquí también
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -24,7 +99,12 @@ class HorarioScreen extends ConsumerWidget {
               const Text('No hay horario cargado'),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ImportScreen()),
+                  );
+                },
                 child: const Text('Importar Horario'),
               ),
             ],
@@ -39,6 +119,7 @@ class HorarioScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF0033A0),
         foregroundColor: Colors.white,
       ),
+      drawer: _buildDrawer(context), // <-- Y lo agregamos cuando el horario sí está cargado
       body: Column(
         children: [
           // Información del estudiante

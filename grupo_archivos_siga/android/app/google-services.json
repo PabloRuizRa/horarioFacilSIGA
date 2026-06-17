@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "565391630059",
+    "project_id": "horario-siga",
+    "storage_bucket": "horario-siga.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:565391630059:android:9db805276756a6956068ae",
+        "android_client_info": {
+          "package_name": "com.example.grupo_archivos_siga"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsPrlwtUJopir0zIRaCZwOg288AybdPIQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
