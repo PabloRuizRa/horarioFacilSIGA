@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart'; // <-- Le quitamos el "as fp"
+import 'package:file_picker/file_picker.dart';
 import '../providers/horario_provider.dart';
-import 'horario_screen.dart';
 import '../providers/navigation_provider.dart';
 
 class ImportScreen extends ConsumerStatefulWidget {
@@ -21,11 +20,10 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
-        withData: true, // <-- CRUCIAL PARA WEB: Fuerza la carga de los bytes
+        withData: true,
       );
 
       if (result != null) {
-        // Extraemos los bytes y el nombre
         final fileBytes = result.files.single.bytes;
         final fileName = result.files.single.name;
 
@@ -35,7 +33,6 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
 
         if (!mounted) return;
         
-        // Aquí devolvemos el código original de tu diálogo
         final periodo = await showDialog<String>(
           context: context,
           builder: (context) => AlertDialog(

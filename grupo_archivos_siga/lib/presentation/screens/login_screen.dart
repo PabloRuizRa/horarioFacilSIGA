@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/horario_provider.dart';
 import 'main_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -33,7 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      // --- CÓDIGO PARA CUMPLIR EL REQUISITO DE FIRESTORE ---
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await FirebaseFirestore.instance.collection('estudiantes_siga').doc(user.uid).set({
@@ -41,18 +42,18 @@ class _LoginScreenState extends State<LoginScreen> {
           'ultimo_acceso': DateTime.now(),
           'estado': 'Activo',
         }, SetOptions(merge: true));
+
+        // --- CARGAR EL HORARIO DE ESTA CUENTA ---
+        await ref.read(horarioProvider.notifier).cargarHorario(user.uid);
       }
-      // -----------------------------------------------------
 
       if (!mounted) return;
-      // Navegar a la pantalla de importación si el login es exitoso
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const MainScreen()),
       );
-    } catch (e) { 
+    } catch (e) {
       if (!mounted) return;
-      
       
       String mensajeError = 'Ocurrió un error inesperado';
       if (e is FirebaseAuthException) {

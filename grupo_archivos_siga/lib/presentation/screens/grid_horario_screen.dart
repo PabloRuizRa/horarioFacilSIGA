@@ -32,7 +32,20 @@ class GridHorarioScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF1B2A4A),
         foregroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false, 
+        automaticallyImplyLeading: false,
+        actions: [
+          // Mostrar el botón de borrar solo si hay un horario cargado
+          if (horario != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              onPressed: () {
+                ref.read(horarioProvider.notifier).eliminarHorarioActual();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Horario eliminado')),
+                );
+              },
+            ),
+        ],
       ),
       body: horario == null
           ? const Center(child: Text('Importa tu horario primero en la pestaña "Subir"'))
@@ -42,7 +55,7 @@ class GridHorarioScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const SizedBox(width: 55), // Espacio para la columna de hora
+                      const SizedBox(width: 55),
                       _buildHeaderDia('Lun'),
                       _buildHeaderDia('Mar'),
                       _buildHeaderDia('Mié'),
@@ -53,7 +66,7 @@ class GridHorarioScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Expanded(
                     child: ListView.builder(
-                      itemCount: 20, // <-- Ahora son 20 bloques
+                      itemCount: 20,
                       itemBuilder: (context, index) {
                         final numBloque = index + 1;
                         return Row(
@@ -128,8 +141,8 @@ class GridHorarioScreen extends ConsumerWidget {
 
     final asignatura = asignaturas.firstWhere((a) => a.id == bloqueInfo.asignaturaId);
     final colorIndex = asignaturas.indexOf(asignatura) % _coloresRamos.length;
-    String nombreCorto = asignatura.nombre.length > 12 ? '${asignatura.nombre.substring(0, 12)}...' : asignatura.nombre;
 
+    
     return Expanded(
       child: Container(
         height: 65,
@@ -143,8 +156,18 @@ class GridHorarioScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(nombreCorto, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
-            Text(bloqueInfo.sala, style: const TextStyle(fontSize: 9, color: Colors.black54), overflow: TextOverflow.ellipsis),
+            Text(
+              asignatura.nombre,
+              style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.black87, height: 1.1),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              bloqueInfo.sala, 
+              style: const TextStyle(fontSize: 8, color: Colors.black54), 
+              overflow: TextOverflow.ellipsis
+            ),
           ],
         ),
       ),

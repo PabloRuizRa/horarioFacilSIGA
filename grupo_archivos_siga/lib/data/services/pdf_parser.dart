@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/asignatura.dart';
 import '../models/bloque.dart';
 import '../models/horario.dart';
@@ -32,7 +33,7 @@ class PdfParser {
 
       final String texto = jsonResponse['text'] ?? '';
 
-      // 1. Extraer estudiante
+      // Extraer estudiante
       String estudiante = 'Estudiante UTFSM';
       final estudianteRegex = RegExp(r'Alumno\s*:\s*([^\n]+)');
       final estudianteMatch = estudianteRegex.firstMatch(texto);
@@ -44,7 +45,7 @@ class PdfParser {
       final Map<String, String> salasMap = {};
       final List<Bloque> bloques = [];
 
-      // 2. Extraer asignaturas y salas
+      // Extraer asignaturas únicas y salas
       final asignaturaRegex = RegExp(r'([A-Z]{3}\d{3}[A-Z-]*?)\s*-\s*([A-ZÁÉÍÓÚÑa-záéíóúñ0-9\s]+?)\s*\((Inscrita|Preinscrita)\)(?:\s*sala\s+([A-Z0-9]+))?');
       for (var match in asignaturaRegex.allMatches(texto)) {
         final codigo = match.group(1)!.trim();
@@ -56,7 +57,7 @@ class PdfParser {
 
         if (!asignaturasMap.containsKey(codigo)) {
           asignaturasMap[codigo] = Asignatura(
-            id: codigo, nombre: nombre, codigo: codigo, profesor: 'USM', seccion: '1', tipo: tipo,
+            id: codigo, nombre: nombre, codigo: codigo, profesor: 'Por definir', seccion: '1', tipo: tipo,
           );
         }
       }
@@ -70,57 +71,107 @@ class PdfParser {
 
         if (!asignaturasMap.containsKey(codigoCompleto)) {
           asignaturasMap[codigoCompleto] = Asignatura(
-            id: codigoCompleto, nombre: 'Asignatura $codigoCompleto', codigo: codigoCompleto, profesor: 'USM', seccion: '1', tipo: tipo,
+            id: codigoCompleto, nombre: 'Asignatura $codigoCompleto', codigo: codigoCompleto, profesor: 'Por definir', seccion: '1', tipo: tipo,
           );
         }
       }
 
-      // 3. Mapeo Seguro (Modo Presentación) para asegurar que la grilla cargue
-      for (var asignatura in asignaturasMap.values) {
-        final code = asignatura.codigo.toUpperCase();
-        
-        // Malla Katerin
-        if (code.contains('EIN092')) _addBloquesDemo(bloques, asignatura.id, code, 'Lunes', [1,2,3,4], salasMap);
-        else if (code.contains('EIN125')) {
-          _addBloquesDemo(bloques, asignatura.id, code, 'Martes', [5,6], salasMap);
-          _addBloquesDemo(bloques, asignatura.id, code, 'Jueves', [5,6], salasMap);
-        }
-        else if (code.contains('EIN099')) _addBloquesDemo(bloques, asignatura.id, code, 'Miércoles', [5,6,7], salasMap);
-        else if (code.contains('EIN098')) _addBloquesDemo(bloques, asignatura.id, code, 'Viernes', [2,3,4,5,6,7], salasMap);
-        
-        // Malla Pablo
-        else if (code.contains('ELE053')) _addBloquesDemo(bloques, asignatura.id, code, 'Lunes', [1,2,3,4], salasMap);
-        else if (code.contains('HMN293')) {
-          _addBloquesDemo(bloques, asignatura.id, code, 'Martes', [9,10,11,12], salasMap);
-          _addBloquesDemo(bloques, asignatura.id, code, 'Miércoles', [9,10], salasMap);
-        }
-        else if (code.contains('ELE054')) _addBloquesDemo(bloques, asignatura.id, code, 'Viernes', [9,10,11,12], salasMap);
-        else if (code.contains('ELE056')) _addBloquesDemo(bloques, asignatura.id, code, 'Lunes', [5,6,7,8], salasMap);
-        
-        // Compartidos
-        else if (code.contains('ELE052')) _addBloquesDemo(bloques, asignatura.id, code, 'Lunes', [5,6,7,8], salasMap);
+      if (asignaturasMap.isEmpty) {
+        throw Exception('No se encontraron asignaturas. Verifica el formato del PDF.');
       }
 
+      // ===================================================================
+      // 3. MAPEO DINÁMICO DE BLOQUES
+      // ===================================================================
+      final dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      
+      int indexDetalle = texto.indexOf('Detalle de horario');
+      String detailText = indexDetalle != -1 ? texto.substring(indexDetalle) : texto;
+
+      // Encontrar en qué índice del texto empieza cada día
+      List<Map<String, dynamic>> dayChunks = [];
+      for (String dia in dias) {
+        int idx = detailText.indexOf('"$dia\\n"');
+        if (idx == -1) idx = detailText.indexOf('"$dia"');
+        if (idx == -1) idx = detailText.indexOf(dia);
+        
+        if (idx != -1) {
+          dayChunks.add({'dia': dia, 'index': idx});
+        }
+      }
+      dayChunks.sort((a, b) => a['index'].compareTo(b['index']));
+
+      // Generar un regex dinámico
+      List<String> knownCodes = asignaturasMap.keys.toList();
+      String codesPattern = knownCodes.map((c) => RegExp.escape(c)).join('|');
+      final codeRegex = RegExp('($codesPattern)');
+
+      // Regex para encontrar los horarios
+      final blockRegex = RegExp(r'\b(\d+(?:-\d+)*)\b\s*\(\d{2}:\d{2}[-–]\d{2}:\d{2}\)');
+
+      // Procesar bloque de texto día por día
+      for (int i = 0; i < dayChunks.length; i++) {
+        String dia = dayChunks[i]['dia'];
+        int start = dayChunks[i]['index'];
+        int end = (i + 1 < dayChunks.length) ? dayChunks[i + 1]['index'] : detailText.length;
+        
+        String chunkText = detailText.substring(start, end);
+
+        // Extraer todos los números de bloque que encuentre en ese día
+        List<String> blockGroups = [];
+        for (var match in blockRegex.allMatches(chunkText)) {
+          blockGroups.add(match.group(1)!);
+        }
+
+        // Extraer todos los códigos de asignaturas en ese día
+        List<String> subjectCodes = [];
+        for (var match in codeRegex.allMatches(chunkText)) {
+          subjectCodes.add(match.group(1)!);
+        }
+
+        // Emparejar 1 a 1 (Zipping)
+        int limit = blockGroups.length < subjectCodes.length ? blockGroups.length : subjectCodes.length;
+        for (int j = 0; j < limit; j++) {
+          String bGroup = blockGroups[j];
+          String sCode = subjectCodes[j];
+
+          // Si el bloque es agrupado lo separamos para llenar cada celda
+          List<String> parts = bGroup.split('-');
+          for (String p in parts) {
+            int n = int.parse(p);
+            
+            // Evitar duplicados si PyPDF leyó la misma celda dos veces
+            if (!bloques.any((b) => b.dia == dia && b.numeroBloque == n && b.asignaturaId == sCode)) {
+              bloques.add(Bloque(
+                id: '${sCode}_${dia}_$n',
+                asignaturaId: sCode,
+                dia: dia,
+                numeroBloque: n,
+                horaInicio: _rangos[n - 1].split('-')[0].trim(),
+                horaFin: _rangos[n - 1].split('-')[1].trim(),
+                sala: salasMap[sCode] ?? 'Por definir',
+              ));
+            }
+          }
+        }
+      }
+
+      // ===================================================================
+      // 4. GUARDADO CON UID DE FIREBASE
+      // ===================================================================
+      final user = FirebaseAuth.instance.currentUser;
+      final horarioId = user?.uid ?? DateTime.now().millisecondsSinceEpoch.toString();
+
       return Horario(
-        id: DateTime.now().millisecondsSinceEpoch.toString(), nombre: 'Horario $periodo', estudiante: estudiante,
-        periodo: periodo, asignaturas: asignaturasMap.values.toList(), bloques: bloques,
+        id: horarioId, 
+        nombre: 'Horario $periodo', 
+        estudiante: estudiante,
+        periodo: periodo, 
+        asignaturas: asignaturasMap.values.toList(), 
+        bloques: bloques,
       );
     } catch (e) {
       throw Exception('Error al procesar PDF: $e');
-    }
-  }
-
-  void _addBloquesDemo(List<Bloque> bloques, String asigId, String asigCodigo, String dia, List<int> nums, Map<String, String> salas) {
-    for (int n in nums) {
-      bloques.add(Bloque(
-        id: '${asigCodigo}_${dia}_$n',
-        asignaturaId: asigId,
-        dia: dia,
-        numeroBloque: n,
-        horaInicio: _rangos[n-1].split('-')[0].trim(),
-        horaFin: _rangos[n-1].split('-')[1].trim(),
-        sala: salas[asigCodigo] ?? 'USM',
-      ));
     }
   }
 }

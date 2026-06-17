@@ -11,7 +11,6 @@ class MainScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Escuchamos en qué pestaña estamos
     final currentIndex = ref.watch(bottomNavProvider);
 
     // Lista de las 3 pantallas de nuestra app
@@ -29,10 +28,9 @@ class MainScreen extends ConsumerWidget {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) {
-          // Cambiamos de pestaña al tocar
           ref.read(bottomNavProvider.notifier).state = index;
         },
-        selectedItemColor: const Color(0xFFE85D04), // Color naranja del Figma
+        selectedItemColor: const Color(0xFFE85D04),
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.white,
         elevation: 8,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <-- Para obtener el usuario y cerrar sesión
+import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/horario_provider.dart';
 import 'import_screen.dart';
 import 'login_screen.dart';
@@ -8,7 +8,6 @@ import 'login_screen.dart';
 class HorarioScreen extends ConsumerWidget {
   const HorarioScreen({super.key});
 
-  // --- WIDGET DEL MENÚ LATERAL (DRAWER) ---
   Widget _buildDrawer(BuildContext context) {
     // Obtenemos el usuario actual de Firebase
     final user = FirebaseAuth.instance.currentUser;
@@ -40,7 +39,6 @@ class HorarioScreen extends ConsumerWidget {
             leading: const Icon(Icons.schedule, color: Color(0xFF0033A0)),
             title: const Text('Mi Horario'),
             onTap: () {
-              // Simplemente cierra el menú porque ya estamos en esta pantalla
               Navigator.pop(context);
             },
           ),
@@ -48,8 +46,7 @@ class HorarioScreen extends ConsumerWidget {
             leading: const Icon(Icons.upload_file, color: Color(0xFF0033A0)),
             title: const Text('Importar Nuevo Horario'),
             onTap: () {
-              Navigator.pop(context); // Cierra el menú
-              // Navega a la pantalla de importación
+              Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ImportScreen()),
@@ -61,13 +58,12 @@ class HorarioScreen extends ConsumerWidget {
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red)),
             onTap: () async {
-              // Cierra sesión en Firebase y limpia el historial de navegación
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false, // Elimina las rutas anteriores para no volver con el botón de "atrás"
+                  (route) => false,
                 );
               }
             },
@@ -85,11 +81,26 @@ class HorarioScreen extends ConsumerWidget {
     if (horario == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Mi Horario'),
-          backgroundColor: const Color(0xFF1B2A4A),
-          foregroundColor: Colors.white,
-        ),
-        drawer: _buildDrawer(context), // <-- Agregamos el menú aquí también
+        title: const Text('Mi Horario'),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF1B2A4A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+          // Mostrar el botón de borrar solo si hay un horario cargado
+          if (horario != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              onPressed: () {
+                ref.read(horarioProvider.notifier).eliminarHorarioActual();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Horario eliminado')),
+                );
+              },
+            ),
+        ],
+      ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -119,7 +130,7 @@ class HorarioScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF0033A0),
         foregroundColor: Colors.white,
       ),
-      drawer: _buildDrawer(context), // <-- Y lo agregamos cuando el horario sí está cargado
+      drawer: _buildDrawer(context),
       body: Column(
         children: [
           // Información del estudiante

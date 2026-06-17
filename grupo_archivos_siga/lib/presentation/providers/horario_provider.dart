@@ -32,4 +32,12 @@ class HorarioNotifier extends StateNotifier<Horario?> {
     final horario = await repo.obtenerHorario(id);
     state = horario;
   }
+
+  Future<void> eliminarHorarioActual() async {
+    if (state != null) {
+      final repo = ref.read(repositoryProvider);
+      await repo.eliminarHorario(state!.id); 
+      state = null; 
+    }
+  }
 }
